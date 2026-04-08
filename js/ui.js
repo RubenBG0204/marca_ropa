@@ -41,7 +41,7 @@ export function initPageTransitions() {
 
 export function initTiltEffects() {
   const targets = document.querySelectorAll(
-    ".product-card, .category-card, .slide, .hero-card, .newsletter-card, .card"
+    ".product-card, .category-card, .slide, .newsletter-card, .card"
   );
   targets.forEach((el) => {
     el.classList.add("tilt");
@@ -49,12 +49,33 @@ export function initTiltEffects() {
       const rect = el.getBoundingClientRect();
       const x = (e.clientX - rect.left) / rect.width - 0.5;
       const y = (e.clientY - rect.top) / rect.height - 0.5;
-      const rotateX = (-y * 6).toFixed(2);
-      const rotateY = (x * 6).toFixed(2);
-      el.style.transform = `perspective(700px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateY(-2px)`;
+      const intensity = el.dataset.tilt === "low" ? 2 : 4;
+      const rotateX = (-y * intensity).toFixed(2);
+      const rotateY = (x * intensity).toFixed(2);
+      el.style.transform = `perspective(700px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
     });
     el.addEventListener("mouseleave", () => {
       el.style.transform = "";
     });
   });
+}
+
+export function initParallax() {
+  const targets = document.querySelectorAll("[data-parallax]");
+  if (!targets.length || window.matchMedia("(hover: none)").matches) return;
+  const strength = 12;
+  const onMove = (e) => {
+    const x = (e.clientX / window.innerWidth - 0.5) * 2;
+    const y = (e.clientY / window.innerHeight - 0.5) * 2;
+    targets.forEach((el) => {
+      el.style.transform = `translate3d(${x * strength}px, ${y * strength}px, 0)`;
+    });
+  };
+  const onLeave = () => {
+    targets.forEach((el) => {
+      el.style.transform = "";
+    });
+  };
+  window.addEventListener("mousemove", onMove);
+  window.addEventListener("mouseleave", onLeave);
 }

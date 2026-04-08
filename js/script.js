@@ -1,20 +1,44 @@
-﻿import { getProducts, filterProducts, getProductById, addProduct, updateProduct, deleteProduct } from "./products.js";
-import { addToCart, cartCount, getCart, updateQty, removeItem, clearCart } from "./cart.js";
+import {
+  getProducts,
+  filterProducts,
+  getProductById,
+  addProduct,
+  updateProduct,
+  deleteProduct
+} from "./products.js";
+import {
+  addToCart,
+  getCart,
+  updateQty,
+  removeItem,
+  clearCart,
+  cartCount
+} from "./cart.js";
 import { registerUser, login, getCurrentUser, logout } from "./users.js";
 import { createOrder, getUserOrders } from "./orders.js";
-import { initMenu, initLoader, initScrollReveal, initPageTransitions, initTiltEffects } from "./ui.js";
+import {
+  showToast,
+  setButtonLoading,
+  validateField,
+  formatPrice,
+  updateCartBadge,
+  smoothScrollTo
+} from "./ui-helpers.js";
+import { initMenu, initLoader, initScrollReveal, initPageTransitions, initTiltEffects, initParallax } from "./ui.js";
 import { initRouter } from "./router.js";
 
-// Global init
+const page = document.body.dataset.page;
+const SIZE_OPTIONS = ["S", "M", "L", "XL"];
+
 initMenu();
 initLoader();
 initScrollReveal();
 initPageTransitions();
 initTiltEffects();
+initParallax();
 initRouter();
+initMobileNav();
 updateCartBadge();
-
-const page = document.body.dataset.page;
 
 if (page === "shop") initShop();
 if (page === "product") initProduct();
@@ -26,31 +50,87 @@ if (page === "profile") initProfile();
 if (page === "orders") initOrders();
 if (page === "admin") initAdmin();
 if (page === "contact") initContact();
+if (page === "home") initHome();
 
-function updateCartBadge() {
-  const badge = document.getElementById("cartCount");
-  if (badge) badge.textContent = cartCount();
+function initMobileNav() {
+  const navLinks = document.getElementById("navLinks");
+  if (!navLinks) return;
+
+  navLinks.querySelectorAll("a").forEach((link) => {
+    link.addEventListener("click", () => {
+      navLinks.classList.remove("open");
+    });
+  });
+}
+
+function simulateAsync(callback, delay = 450) {
+  return new Promise((resolve, reject) => {
+    window.setTimeout(() => {
+      try {
+        const result = callback();
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      }
+    }, delay);
+  });
+}
+
+async function runButtonAction(button, loadingText, task) {
+  const restore = setButtonLoading(button, true, loadingText);
+  try {
+    return await task();
+  } finally {
+    restore();
+  }
+}
+
+function getCartDetails() {
+  const products = getProducts();
+  const cart = getCart();
+  const items = cart
+    .map((item) => {
+      const product = products.find((entry) => entry.id === item.id);
+      if (!product) return null;
+      return {
+        ...item,
+        product,
+        lineTotal: product.price * item.qty
+      };
+    })
+    .filter(Boolean);
+
+  const total = items.reduce((sum, item) => sum + item.lineTotal, 0);
+  return { items, total };
 }
 
 function renderProducts(container, products) {
-  container.innerHTML = products.map((p) => `
+  if (!container) return;
+
+  container.innerHTML = products.map((product) => `
     <article class="product-card">
-      <div class="product-img ${p.image}"></div>
+      <div class="product-img ${product.image}"></div>
       <div class="product-info">
-        <h3>${p.name}</h3>
-        <p class="price">€${p.price}</p>
+        <h3>${product.name}</h3>
+        <p class="price">${formatPrice(product.price)}</p>
         <div class="card-actions">
-          <a class="btn ghost" href="product.html?id=${p.id}">View</a>
-          <button class="btn add-to-cart" data-id="${p.id}">Add to Cart</button>
+          <a class="btn ghost" href="product.html?id=${product.id}">View</a>
+          <button class="btn add-to-cart" data-id="${product.id}" type="button">Add to Cart</button>
         </div>
       </div>
     </article>
   `).join("");
 
-  container.querySelectorAll(".add-to-cart").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      addToCart(btn.dataset.id, 1);
-      updateCartBadge();
+  container.querySelectorAll(".add-to-cart").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const product = getProductById(button.dataset.id);
+      if (!product) return;
+
+      await runButtonAction(button, "Anadiendo...", async () => {
+        await simulateAsync(() => addToCart(product.id, 1, "M"), 320);
+        updateCartBadge();
+        showToast(`${product.name} se ha anadido al carrito en talla M.`, "success");
+      });
     });
   });
 }
@@ -62,6 +142,8 @@ function initShop() {
   const price = document.getElementById("priceFilter");
   const sort = document.getElementById("sortFilter");
 
+  if (!grid || !search || !category || !price || !sort) return;
+
   const applyFilters = () => {
     const products = filterProducts({
       search: search.value,
@@ -72,12 +154,18 @@ function initShop() {
     renderProducts(grid, products);
   };
 
-  [search, category, price, sort].forEach((el) => el.addEventListener("input", applyFilters));
+  [search, category, price, sort].forEach((element) => {
+    element.addEventListener("input", applyFilters);
+    element.addEventListener("change", applyFilters);
+  });
+
   applyFilters();
 }
 
 function initProduct() {
   const container = document.getElementById("productDetail");
+  if (!container) return;
+
   const params = new URLSearchParams(window.location.search);
   const id = params.get("id") || "p1";
   const product = getProductById(id) || getProducts()[0];
@@ -94,207 +182,348 @@ function initProduct() {
       </div>
       <div class="card">
         <h1>${product.name}</h1>
-        <p class="price">€${product.price}</p>
+        <p class="price">${formatPrice(product.price)}</p>
         <p class="muted">${product.description}</p>
         <div class="size-selector" id="sizeSelector">
-          <button type="button">S</button>
-          <button type="button">M</button>
-          <button type="button">L</button>
-          <button type="button">XL</button>
+          ${SIZE_OPTIONS.map((size) => `<button type="button" data-size="${size}">${size}</button>`).join("")}
         </div>
+        <small class="error" id="sizeError"></small>
         <div class="qty">
           <button type="button" id="qtyMinus">-</button>
           <span id="qtyValue">1</span>
           <button type="button" id="qtyPlus">+</button>
         </div>
-        <button class="btn" id="addProduct">Add to Cart</button>
+        <button class="btn" id="addProduct" type="button">Add to Cart</button>
       </div>
     </div>
   `;
 
   let qty = 1;
+  let selectedSize = "";
+
   const qtyValue = document.getElementById("qtyValue");
+  const sizeError = document.getElementById("sizeError");
+  const sizeButtons = [...document.querySelectorAll("#sizeSelector button")];
+  const addButton = document.getElementById("addProduct");
+
   document.getElementById("qtyMinus").addEventListener("click", () => {
     qty = Math.max(1, qty - 1);
-    qtyValue.textContent = qty;
+    qtyValue.textContent = String(qty);
   });
+
   document.getElementById("qtyPlus").addEventListener("click", () => {
     qty += 1;
-    qtyValue.textContent = qty;
+    qtyValue.textContent = String(qty);
   });
-  document.getElementById("addProduct").addEventListener("click", () => {
-    addToCart(product.id, qty);
-    updateCartBadge();
+
+  sizeButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      selectedSize = button.dataset.size;
+      sizeButtons.forEach((entry) => entry.classList.toggle("active", entry === button));
+      if (sizeError) sizeError.textContent = "";
+    });
+  });
+
+  addButton.addEventListener("click", async () => {
+    if (!selectedSize) {
+      if (sizeError) sizeError.textContent = "Selecciona una talla.";
+      showToast("Selecciona una talla antes de anadir el producto.", "error");
+      return;
+    }
+
+    await runButtonAction(addButton, "Anadiendo...", async () => {
+      await simulateAsync(() => addToCart(product.id, qty, selectedSize), 360);
+      updateCartBadge();
+      if (sizeError) sizeError.textContent = "";
+      showToast(`${product.name} anadido al carrito. Talla ${selectedSize}.`, "success");
+    });
   });
 
   const related = document.getElementById("relatedProducts");
-  const products = getProducts().filter((p) => p.id !== product.id).slice(0, 4);
-  renderProducts(related, products);
+  const relatedProducts = getProducts().filter((entry) => entry.id !== product.id).slice(0, 4);
+  renderProducts(related, relatedProducts);
 }
 
 function initCart() {
-  const itemsEl = document.getElementById("cartItems");
-  const summaryEl = document.getElementById("cartSummary");
-  const products = getProducts();
-  const cart = getCart();
+  const itemsElement = document.getElementById("cartItems");
+  const summaryElement = document.getElementById("cartSummary");
+  if (!itemsElement || !summaryElement) return;
 
-  if (cart.length === 0) {
-    itemsEl.innerHTML = "<p class='muted'>Your cart is empty.</p>";
-    summaryEl.innerHTML = "<p class='muted'>Add items to continue.</p>";
-    return;
-  }
+  const renderCart = () => {
+    const { items, total } = getCartDetails();
 
-  itemsEl.innerHTML = cart.map((item) => {
-    const product = products.find((p) => p.id === item.id);
-    return `
+    if (!items.length) {
+      itemsElement.innerHTML = "<p class='muted'>Your cart is empty.</p>";
+      summaryElement.innerHTML = "<p class='muted'>Add items to continue.</p>";
+      updateCartBadge();
+      return;
+    }
+
+    itemsElement.innerHTML = items.map((item) => `
       <div class="cart-item card">
-        <div class="product-img ${product.image}"></div>
-        <div>
-          <h3>${product.name}</h3>
-          <p class="muted">€${product.price}</p>
+        <div class="product-img ${item.product.image}"></div>
+        <div class="cart-meta">
+          <h3>${item.product.name}</h3>
+          <p class="muted">${formatPrice(item.product.price)}</p>
+          <span class="cart-size">Talla ${item.size || "M"}</span>
           <div class="qty">
-            <button data-action="minus" data-id="${product.id}">-</button>
+            <button data-action="minus" data-id="${item.product.id}" data-size="${item.size}" type="button">-</button>
             <span>${item.qty}</span>
-            <button data-action="plus" data-id="${product.id}">+</button>
-            <button data-action="remove" data-id="${product.id}" class="btn ghost">Remove</button>
+            <button data-action="plus" data-id="${item.product.id}" data-size="${item.size}" type="button">+</button>
+            <button data-action="remove" data-id="${item.product.id}" data-size="${item.size}" class="btn ghost" type="button">Remove</button>
           </div>
         </div>
-        <strong>€${product.price * item.qty}</strong>
+        <strong>${formatPrice(item.lineTotal)}</strong>
       </div>
+    `).join("");
+
+    summaryElement.innerHTML = `
+      <h3>Summary</h3>
+      <p>Items: <strong>${cartCount()}</strong></p>
+      <p>Total: <strong>${formatPrice(total)}</strong></p>
+      <a class="btn" href="checkout.html">Checkout</a>
     `;
-  }).join("");
 
-  const total = cart.reduce((sum, item) => {
-    const product = products.find((p) => p.id === item.id);
-    return sum + product.price * item.qty;
-  }, 0);
+    itemsElement.querySelectorAll("button").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const { id, size, action } = button.dataset;
+        const currentItem = getCart().find((entry) => entry.id === id && entry.size === size);
+        if (!currentItem) return;
 
-  summaryEl.innerHTML = `
-    <h3>Summary</h3>
-    <p>Total: <strong>€${total}</strong></p>
-    <a class="btn" href="checkout.html">Checkout</a>
-  `;
+        await runButtonAction(button, "Actualizando...", async () => {
+          await simulateAsync(() => {
+            if (action === "minus") updateQty(id, size, currentItem.qty - 1);
+            if (action === "plus") updateQty(id, size, currentItem.qty + 1);
+            if (action === "remove") removeItem(id, size);
+          }, 220);
 
-  itemsEl.querySelectorAll("button").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const id = btn.dataset.id;
-      const action = btn.dataset.action;
-      const item = cart.find((c) => c.id === id);
-      if (action === "minus") updateQty(id, item.qty - 1);
-      if (action === "plus") updateQty(id, item.qty + 1);
-      if (action === "remove") removeItem(id);
-      window.location.reload();
+          updateCartBadge();
+          renderCart();
+
+          if (action === "remove") {
+            showToast("Producto eliminado del carrito.", "info");
+          }
+        });
+      });
     });
-  });
+  };
+
+  renderCart();
 }
 
 function initCheckout() {
   const summary = document.getElementById("checkoutSummary");
-  const products = getProducts();
-  const cart = getCart();
-  const total = cart.reduce((sum, item) => {
-    const product = products.find((p) => p.id === item.id);
-    return sum + product.price * item.qty;
-  }, 0);
-
-  summary.innerHTML = `
-    <h3>Order Summary</h3>
-    <p>Items: ${cartCount()}</p>
-    <p>Total: <strong>€${total}</strong></p>
-  `;
-
   const form = document.getElementById("checkoutForm");
   const success = document.getElementById("checkoutSuccess");
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const name = document.getElementById("fullName");
-    const email = document.getElementById("email");
-    const address = document.getElementById("address");
-    const card = document.getElementById("card");
+  if (!summary || !form || !success) return;
 
-    const valid = validateField(name, "nameError") &
-      validateField(email, "emailError", true) &
-      validateField(address, "addressError") &
-      validateField(card, "cardError");
+  const renderSummary = () => {
+    const { items, total } = getCartDetails();
+    summary.innerHTML = `
+      <h3>Order Summary</h3>
+      ${items.map((item) => `
+        <p>${item.product.name} x${item.qty} <span class="muted">(Talla ${item.size || "M"})</span></p>
+      `).join("")}
+      <p>Items: ${cartCount()}</p>
+      <p>Total: <strong>${formatPrice(total)}</strong></p>
+    `;
+  };
 
-    if (!valid) return;
+  renderSummary();
 
-    const user = getCurrentUser();
-    createOrder({
-      id: `o${Date.now()}`,
-      userId: user ? user.id : "guest",
-      name: name.value,
-      items: cart,
-      total,
-      date: new Date().toISOString()
+  const name = document.getElementById("fullName");
+  const email = document.getElementById("email");
+  const address = document.getElementById("address");
+  const card = document.getElementById("card");
+  const submitButton = form.querySelector('button[type="submit"]');
+
+  const rules = [
+    { input: name, config: { errorId: "nameError", required: true, minLength: 3 } },
+    { input: email, config: { errorId: "emailError", required: true, isEmail: true } },
+    { input: address, config: { errorId: "addressError", required: true, minLength: 8 } },
+    { input: card, config: { errorId: "cardError", required: true, isCreditCard: true } }
+  ];
+
+  rules.forEach(({ input, config }) => {
+    input?.addEventListener("blur", () => {
+      validateField(input, config);
     });
-    clearCart();
-    updateCartBadge();
-    success.textContent = "Order placed! Confirmation sent to your email.";
-    form.reset();
+  });
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    success.textContent = "";
+
+    const { items, total } = getCartDetails();
+    if (!items.length) {
+      showToast("Tu carrito esta vacio.", "error");
+      return;
+    }
+
+    const isValid = rules.every(({ input, config }) => validateField(input, config));
+    if (!isValid) {
+      showToast("Revisa los campos marcados antes de continuar.", "error");
+      return;
+    }
+
+    await runButtonAction(submitButton, "Procesando...", async () => {
+      await simulateAsync(() => {
+        const user = getCurrentUser();
+        createOrder({
+          id: `o${Date.now()}`,
+          userId: user ? user.id : "guest",
+          name: name.value.trim(),
+          items,
+          total,
+          date: new Date().toISOString()
+        });
+        clearCart();
+      }, 520);
+
+      updateCartBadge();
+      renderSummary();
+      success.textContent = "Order placed successfully.";
+      form.reset();
+      [name, email, address, card].forEach((input) => {
+        input.classList.remove("input-valid", "input-invalid");
+      });
+      showToast("Pedido completado con exito.", "success");
+      smoothScrollTo(success, { offset: 120 });
+    });
   });
 }
 
 function initLogin() {
   const form = document.getElementById("loginForm");
   const success = document.getElementById("loginSuccess");
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const email = document.getElementById("email");
-    const password = document.getElementById("password");
-    const ok = validateField(email, "emailError", true) & validateField(password, "passwordError");
-    if (!ok) return;
-    const result = login(email.value, password.value);
-    success.textContent = result.success ? "Login successful." : result.message;
+  if (!form || !success) return;
+
+  const email = document.getElementById("email");
+  const password = document.getElementById("password");
+  const submitButton = form.querySelector('button[type="submit"]');
+
+  const rules = [
+    { input: email, config: { errorId: "emailError", required: true, isEmail: true } },
+    { input: password, config: { errorId: "passwordError", required: true, minLength: 6 } }
+  ];
+
+  rules.forEach(({ input, config }) => {
+    input?.addEventListener("blur", () => validateField(input, config));
+  });
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    success.textContent = "";
+
+    const isValid = rules.every(({ input, config }) => validateField(input, config));
+    if (!isValid) {
+      showToast("Introduce un email y contrasena validos.", "error");
+      return;
+    }
+
+    await runButtonAction(submitButton, "Entrando...", async () => {
+      const result = await simulateAsync(() => login(email.value.trim(), password.value), 420);
+      if (result.success) {
+        success.textContent = "Login successful.";
+        showToast("Sesion iniciada correctamente.", "success");
+      } else {
+        success.textContent = "";
+        showToast(result.message, "error");
+      }
+    });
   });
 }
 
 function initRegister() {
   const form = document.getElementById("registerForm");
   const success = document.getElementById("registerSuccess");
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const name = document.getElementById("name");
-    const email = document.getElementById("email");
-    const password = document.getElementById("password");
-    const ok = validateField(name, "nameError") & validateField(email, "emailError", true) & validateField(password, "passwordError");
-    if (!ok) return;
-    const result = registerUser({ name: name.value, email: email.value, password: password.value });
-    success.textContent = result.success ? "Account created." : result.message;
+  if (!form || !success) return;
+
+  const name = document.getElementById("name");
+  const email = document.getElementById("email");
+  const password = document.getElementById("password");
+  const submitButton = form.querySelector('button[type="submit"]');
+
+  const rules = [
+    { input: name, config: { errorId: "nameError", required: true, minLength: 3 } },
+    { input: email, config: { errorId: "emailError", required: true, isEmail: true } },
+    { input: password, config: { errorId: "passwordError", required: true, minLength: 6 } }
+  ];
+
+  rules.forEach(({ input, config }) => {
+    input?.addEventListener("blur", () => validateField(input, config));
+  });
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    success.textContent = "";
+
+    const isValid = rules.every(({ input, config }) => validateField(input, config));
+    if (!isValid) {
+      showToast("Completa correctamente los campos del registro.", "error");
+      return;
+    }
+
+    await runButtonAction(submitButton, "Creando...", async () => {
+      const result = await simulateAsync(() => registerUser({
+        name: name.value.trim(),
+        email: email.value.trim(),
+        password: password.value
+      }), 450);
+
+      if (result.success) {
+        success.textContent = "Account created.";
+        form.reset();
+        [name, email, password].forEach((input) => input.classList.remove("input-valid", "input-invalid"));
+        showToast("Cuenta creada correctamente.", "success");
+      } else {
+        success.textContent = "";
+        showToast(result.message, "error");
+      }
+    });
   });
 }
 
 function initProfile() {
   const card = document.getElementById("profileCard");
+  if (!card) return;
+
   const user = getCurrentUser();
   if (!user) {
     card.innerHTML = "<p class='muted'>You are not logged in.</p><a class='btn' href='login.html'>Login</a>";
     return;
   }
+
   card.innerHTML = `
     <h2>${user.name}</h2>
     <p class="muted">${user.email}</p>
-    <button class="btn ghost" id="logoutBtn">Logout</button>
+    <button class="btn ghost" id="logoutBtn" type="button">Logout</button>
   `;
-  document.getElementById("logoutBtn").addEventListener("click", () => {
+
+  document.getElementById("logoutBtn")?.addEventListener("click", () => {
     logout();
-    window.location.reload();
+    showToast("Sesion cerrada.", "info");
+    window.setTimeout(() => window.location.reload(), 250);
   });
 }
 
 function initOrders() {
   const list = document.getElementById("ordersList");
+  if (!list) return;
+
   const user = getCurrentUser();
   const orders = user ? getUserOrders(user.id) : [];
+
   if (!orders.length) {
     list.innerHTML = "<p class='muted'>No orders yet.</p>";
     return;
   }
-  list.innerHTML = orders.map((o) => `
+
+  list.innerHTML = orders.map((order) => `
     <div class="order-card">
-      <h3>Order ${o.id}</h3>
-      <p class="muted">${new Date(o.date).toLocaleDateString()}</p>
-      <p>Total: €${o.total}</p>
+      <h3>Order ${order.id}</h3>
+      <p class="muted">${new Date(order.date).toLocaleDateString()}</p>
+      <p>Total: ${formatPrice(order.total)}</p>
     </div>
   `).join("");
 }
@@ -303,61 +532,103 @@ function initAdmin() {
   const list = document.getElementById("adminList");
   const form = document.getElementById("adminForm");
   const success = document.getElementById("adminSuccess");
+  if (!list || !form || !success) return;
+
+  const fields = {
+    id: document.getElementById("productId"),
+    name: document.getElementById("productName"),
+    category: document.getElementById("productCategory"),
+    price: document.getElementById("productPrice"),
+    image: document.getElementById("productImage")
+  };
+
+  const submitButton = form.querySelector('button[type="submit"]');
+  const rules = [
+    { input: fields.name, config: { errorId: "productNameError", required: true, minLength: 3 } },
+    { input: fields.price, config: { errorId: "productPriceError", required: true } },
+    { input: fields.image, config: { errorId: "productImageError", required: true, minLength: 5 } }
+  ];
+
+  rules.forEach(({ input, config }) => {
+    input?.addEventListener("blur", () => validateField(input, config));
+  });
 
   const render = () => {
     const products = getProducts();
     list.innerHTML = `
       <h3>Products</h3>
       <div class="admin-list">
-        ${products.map((p) => `
+        ${products.map((product) => `
           <div class="admin-item">
-            <span>${p.name} - €${p.price}</span>
+            <span>${product.name} - ${formatPrice(product.price)}</span>
             <div>
-              <button class="btn ghost" data-action="edit" data-id="${p.id}">Edit</button>
-              <button class="btn ghost" data-action="delete" data-id="${p.id}">Delete</button>
+              <button class="btn ghost" data-action="edit" data-id="${product.id}" type="button">Edit</button>
+              <button class="btn ghost" data-action="delete" data-id="${product.id}" type="button">Delete</button>
             </div>
           </div>
         `).join("")}
       </div>
     `;
 
-    list.querySelectorAll("button").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const id = btn.dataset.id;
-        const action = btn.dataset.action;
-        if (action === "delete") {
-          deleteProduct(id);
-          render();
-        }
+    list.querySelectorAll("button").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const { id, action } = button.dataset;
+
         if (action === "edit") {
           const product = getProductById(id);
-          document.getElementById("productId").value = product.id;
-          document.getElementById("productName").value = product.name;
-          document.getElementById("productCategory").value = product.category;
-          document.getElementById("productPrice").value = product.price;
-          document.getElementById("productImage").value = product.image;
+          if (!product) return;
+          fields.id.value = product.id;
+          fields.name.value = product.name;
+          fields.category.value = product.category;
+          fields.price.value = product.price;
+          fields.image.value = product.image;
+          showToast("Producto cargado para edicion.", "info");
+          smoothScrollTo(form, { offset: 100 });
+          return;
         }
+
+        await runButtonAction(button, "Eliminando...", async () => {
+          await simulateAsync(() => deleteProduct(id), 280);
+          render();
+          showToast("Producto eliminado.", "success");
+        });
       });
     });
   };
 
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const id = document.getElementById("productId").value || `p${Date.now()}`;
-    const name = document.getElementById("productName");
-    const category = document.getElementById("productCategory");
-    const price = document.getElementById("productPrice");
-    const image = document.getElementById("productImage");
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    success.textContent = "";
 
-    const ok = validateField(name, "productNameError") & validateField(price, "productPriceError") & validateField(image, "productImageError");
-    if (!ok) return;
+    const isValid = rules.every(({ input, config }) => validateField(input, config));
+    if (!isValid) {
+      showToast("Revisa los datos del producto.", "error");
+      return;
+    }
 
-    const product = { id, name: name.value, category: category.value, price: Number(price.value), image: image.value, description: "Custom product" };
-    const exists = getProductById(id);
-    if (exists) updateProduct(product); else addProduct(product);
-    success.textContent = "Product saved.";
-    form.reset();
-    render();
+    const product = {
+      id: fields.id.value || `p${Date.now()}`,
+      name: fields.name.value.trim(),
+      category: fields.category.value,
+      price: Number(fields.price.value),
+      image: fields.image.value.trim(),
+      description: "Custom product"
+    };
+
+    await runButtonAction(submitButton, "Guardando...", async () => {
+      await simulateAsync(() => {
+        const exists = getProductById(product.id);
+        if (exists) updateProduct(product);
+        else addProduct(product);
+      }, 420);
+
+      success.textContent = "Product saved.";
+      form.reset();
+      fields.id.value = "";
+      Object.values(fields).forEach((field) => field?.classList.remove("input-valid", "input-invalid"));
+      render();
+      showToast("Producto guardado correctamente.", "success");
+    });
   });
 
   render();
@@ -366,31 +637,67 @@ function initAdmin() {
 function initContact() {
   const form = document.getElementById("contactForm");
   const success = document.getElementById("contactSuccess");
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const name = document.getElementById("name");
-    const email = document.getElementById("email");
-    const message = document.getElementById("message");
-    const ok = validateField(name, "nameError") & validateField(email, "emailError", true) & validateField(message, "messageError");
-    if (!ok) return;
-    success.textContent = "Thanks! We will reply soon.";
-    form.reset();
+  if (!form || !success) return;
+
+  const name = document.getElementById("name");
+  const email = document.getElementById("email");
+  const message = document.getElementById("message");
+  const submitButton = form.querySelector('button[type="submit"]');
+
+  const rules = [
+    { input: name, config: { errorId: "nameError", required: true, minLength: 2 } },
+    { input: email, config: { errorId: "emailError", required: true, isEmail: true } },
+    { input: message, config: { errorId: "messageError", required: true, minLength: 10 } }
+  ];
+
+  rules.forEach(({ input, config }) => {
+    input?.addEventListener("blur", () => validateField(input, config));
+  });
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    success.textContent = "";
+
+    const isValid = rules.every(({ input, config }) => validateField(input, config));
+    if (!isValid) {
+      showToast("Completa correctamente el formulario de contacto.", "error");
+      return;
+    }
+
+    await runButtonAction(submitButton, "Enviando...", async () => {
+      await simulateAsync(() => true, 500);
+      success.textContent = "Thanks! We will reply soon.";
+      form.reset();
+      [name, email, message].forEach((input) => input.classList.remove("input-valid", "input-invalid"));
+      showToast("Mensaje enviado. Te responderemos pronto.", "success");
+    });
   });
 }
 
-function validateField(input, errorId, isEmail = false) {
-  const error = document.getElementById(errorId);
-  if (!input.value.trim()) {
-    if (error) error.textContent = "Required.";
-    return false;
-  }
-  if (isEmail) {
-    const pattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!pattern.test(input.value)) {
-      if (error) error.textContent = "Invalid email.";
-      return false;
+function initHome() {
+  const newsletterForm = document.querySelector(".newsletter-form");
+  if (!newsletterForm) return;
+
+  const emailInput = newsletterForm.querySelector('input[type="email"]');
+  const submitButton = newsletterForm.querySelector('button[type="submit"]');
+  if (!emailInput || !submitButton) return;
+
+  emailInput.addEventListener("blur", () => {
+    validateField(emailInput, { required: true, isEmail: true });
+  });
+
+  newsletterForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!validateField(emailInput, { required: true, isEmail: true })) {
+      showToast("Introduce un email valido para suscribirte.", "error");
+      return;
     }
-  }
-  if (error) error.textContent = "";
-  return true;
+
+    await runButtonAction(submitButton, "Enviando...", async () => {
+      await simulateAsync(() => true, 350);
+      newsletterForm.reset();
+      emailInput.classList.remove("input-valid", "input-invalid");
+      showToast("Suscripcion completada.", "success");
+    });
+  });
 }
