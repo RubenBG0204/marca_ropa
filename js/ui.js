@@ -79,3 +79,17 @@ export function initParallax() {
   window.addEventListener("mousemove", onMove);
   window.addEventListener("mouseleave", onLeave);
 }
+
+export function initBackToTop() {
+  const btn = document.getElementById("backToTop");
+  if (!btn) return;
+  const toggle = () => {
+    if (window.scrollY > 300) btn.classList.add("show");
+    else btn.classList.remove("show");
+  };
+  btn.addEventListener("click", () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+  window.addEventListener("scroll", toggle);
+  toggle();
+}

@@ -24,7 +24,7 @@ import {
   updateCartBadge,
   smoothScrollTo
 } from "./ui-helpers.js";
-import { initMenu, initLoader, initScrollReveal, initPageTransitions, initTiltEffects, initParallax } from "./ui.js";
+import { initMenu, initLoader, initScrollReveal, initPageTransitions, initTiltEffects, initParallax, initBackToTop } from "./ui.js";
 import { initRouter } from "./router.js";
 
 const page = document.body.dataset.page;
@@ -36,6 +36,7 @@ initScrollReveal();
 initPageTransitions();
 initTiltEffects();
 initParallax();
+initBackToTop();
 initRouter();
 initMobileNav();
 updateCartBadge();
