@@ -42,7 +42,7 @@ export function showToast(message, type = "info", duration = TOAST_DURATION) {
   return toast;
 }
 
-export function setButtonLoading(button, isLoading, loadingText = "Loading...") {
+export function setButtonLoading(button, isLoading, loadingText = "Cargando...") {
   if (!button) return () => {};
 
   if (!button.dataset.originalHtml) {
@@ -108,16 +108,16 @@ export function validateField(input, options = {}) {
   let message = "";
 
   if (required && !value) {
-    message = "Required.";
+    message = "Obligatorio.";
   } else if (isEmail) {
     const pattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!pattern.test(value)) {
-      message = "Invalid email.";
+      message = "Email inválido.";
     }
   } else if (minLength && value.length < minLength) {
     message = `Minimum ${minLength} characters.`;
   } else if (isCreditCard && !isValidCreditCard(value)) {
-    message = "Invalid card number.";
+    message = "Número de tarjeta inválido.";
   }
 
   if (error) error.textContent = message;

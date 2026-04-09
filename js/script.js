@@ -115,8 +115,8 @@ function renderProducts(container, products) {
         <h3>${product.name}</h3>
         <p class="price">${formatPrice(product.price)}</p>
         <div class="card-actions">
-          <a class="btn ghost" href="product.html?id=${product.id}">View</a>
-          <button class="btn add-to-cart" data-id="${product.id}" type="button">Add to Cart</button>
+          <a class="btn ghost" href="product.html?id=${product.id}">Ver</a>
+          <button class="btn add-to-cart" data-id="${product.id}" type="button">Añadir al carrito</button>
         </div>
       </div>
     </article>
@@ -127,10 +127,10 @@ function renderProducts(container, products) {
       const product = getProductById(button.dataset.id);
       if (!product) return;
 
-      await runButtonAction(button, "Anadiendo...", async () => {
+      await runButtonAction(button, "Añadiendo...", async () => {
         await simulateAsync(() => addToCart(product.id, 1, "M"), 320);
         updateCartBadge();
-        showToast(`${product.name} se ha anadido al carrito en talla M.`, "success");
+        showToast(`${product.name} se ha añadido al carrito en talla M.`, "success");
       });
     });
   });
@@ -194,7 +194,7 @@ function initProduct() {
           <span id="qtyValue">1</span>
           <button type="button" id="qtyPlus">+</button>
         </div>
-        <button class="btn" id="addProduct" type="button">Add to Cart</button>
+        <button class="btn" id="addProduct" type="button">Añadir al carrito</button>
       </div>
     </div>
   `;
@@ -228,15 +228,15 @@ function initProduct() {
   addButton.addEventListener("click", async () => {
     if (!selectedSize) {
       if (sizeError) sizeError.textContent = "Selecciona una talla.";
-      showToast("Selecciona una talla antes de anadir el producto.", "error");
+      showToast("Selecciona una talla antes de añadir el producto.", "error");
       return;
     }
 
-    await runButtonAction(addButton, "Anadiendo...", async () => {
+    await runButtonAction(addButton, "Añadiendo...", async () => {
       await simulateAsync(() => addToCart(product.id, qty, selectedSize), 360);
       updateCartBadge();
       if (sizeError) sizeError.textContent = "";
-      showToast(`${product.name} anadido al carrito. Talla ${selectedSize}.`, "success");
+      showToast(`${product.name} añadido al carrito. Talla ${selectedSize}.`, "success");
     });
   });
 
@@ -254,8 +254,8 @@ function initCart() {
     const { items, total } = getCartDetails();
 
     if (!items.length) {
-      itemsElement.innerHTML = "<p class='muted'>Your cart is empty.</p>";
-      summaryElement.innerHTML = "<p class='muted'>Add items to continue.</p>";
+      itemsElement.innerHTML = "<p class='muted'>Tu carrito está vacío.</p>";
+      summaryElement.innerHTML = "<p class='muted'>Añade productos para continuar.</p>";
       updateCartBadge();
       return;
     }
@@ -271,7 +271,7 @@ function initCart() {
             <button data-action="minus" data-id="${item.product.id}" data-size="${item.size}" type="button">-</button>
             <span>${item.qty}</span>
             <button data-action="plus" data-id="${item.product.id}" data-size="${item.size}" type="button">+</button>
-            <button data-action="remove" data-id="${item.product.id}" data-size="${item.size}" class="btn ghost" type="button">Remove</button>
+            <button data-action="remove" data-id="${item.product.id}" data-size="${item.size}" class="btn ghost" type="button">Eliminar</button>
           </div>
         </div>
         <strong>${formatPrice(item.lineTotal)}</strong>
@@ -279,10 +279,10 @@ function initCart() {
     `).join("");
 
     summaryElement.innerHTML = `
-      <h3>Summary</h3>
-      <p>Items: <strong>${cartCount()}</strong></p>
+      <h3>Resumen</h3>
+      <p>Artículos: <strong>${cartCount()}</strong></p>
       <p>Total: <strong>${formatPrice(total)}</strong></p>
-      <a class="btn" href="checkout.html">Checkout</a>
+      <a class="btn" href="checkout.html">Pagar</a>
     `;
 
     itemsElement.querySelectorAll("button").forEach((button) => {
@@ -321,11 +321,11 @@ function initCheckout() {
   const renderSummary = () => {
     const { items, total } = getCartDetails();
     summary.innerHTML = `
-      <h3>Order Summary</h3>
+      <h3>Resumen del pedido</h3>
       ${items.map((item) => `
         <p>${item.product.name} x${item.qty} <span class="muted">(Talla ${item.size || "M"})</span></p>
       `).join("")}
-      <p>Items: ${cartCount()}</p>
+      <p>Artículos: ${cartCount()}</p>
       <p>Total: <strong>${formatPrice(total)}</strong></p>
     `;
   };
@@ -357,7 +357,7 @@ function initCheckout() {
 
     const { items, total } = getCartDetails();
     if (!items.length) {
-      showToast("Tu carrito esta vacio.", "error");
+      showToast("Tu carrito está vacío.", "error");
       return;
     }
 
@@ -383,12 +383,12 @@ function initCheckout() {
 
       updateCartBadge();
       renderSummary();
-      success.textContent = "Order placed successfully.";
+      success.textContent = "Pedido realizado correctamente.";
       form.reset();
       [name, email, address, card].forEach((input) => {
         input.classList.remove("input-valid", "input-invalid");
       });
-      showToast("Pedido completado con exito.", "success");
+      showToast("Pedido completado con éxito.", "success");
       smoothScrollTo(success, { offset: 120 });
     });
   });
@@ -418,15 +418,15 @@ function initLogin() {
 
     const isValid = rules.every(({ input, config }) => validateField(input, config));
     if (!isValid) {
-      showToast("Introduce un email y contrasena validos.", "error");
+      showToast("Introduce un email y contraseña válidos.", "error");
       return;
     }
 
     await runButtonAction(submitButton, "Entrando...", async () => {
       const result = await simulateAsync(() => login(email.value.trim(), password.value), 420);
       if (result.success) {
-        success.textContent = "Login successful.";
-        showToast("Sesion iniciada correctamente.", "success");
+        success.textContent = "Inicio de sesión correcto.";
+        showToast("Sesión iniciada correctamente.", "success");
       } else {
         success.textContent = "";
         showToast(result.message, "error");
@@ -473,7 +473,7 @@ function initRegister() {
       }), 450);
 
       if (result.success) {
-        success.textContent = "Account created.";
+        success.textContent = "Cuenta creada.";
         form.reset();
         [name, email, password].forEach((input) => input.classList.remove("input-valid", "input-invalid"));
         showToast("Cuenta creada correctamente.", "success");
@@ -491,19 +491,19 @@ function initProfile() {
 
   const user = getCurrentUser();
   if (!user) {
-    card.innerHTML = "<p class='muted'>You are not logged in.</p><a class='btn' href='login.html'>Login</a>";
+    card.innerHTML = "<p class='muted'>No has iniciado sesión.</p><a class='btn' href='login.html'>Iniciar sesión</a>";
     return;
   }
 
   card.innerHTML = `
     <h2>${user.name}</h2>
     <p class="muted">${user.email}</p>
-    <button class="btn ghost" id="logoutBtn" type="button">Logout</button>
+    <button class="btn ghost" id="logoutBtn" type="button">Cerrar sesión</button>
   `;
 
   document.getElementById("logoutBtn")?.addEventListener("click", () => {
     logout();
-    showToast("Sesion cerrada.", "info");
+    showToast("Sesión cerrada.", "info");
     window.setTimeout(() => window.location.reload(), 250);
   });
 }
@@ -516,13 +516,13 @@ function initOrders() {
   const orders = user ? getUserOrders(user.id) : [];
 
   if (!orders.length) {
-    list.innerHTML = "<p class='muted'>No orders yet.</p>";
+    list.innerHTML = "<p class='muted'>Aún no hay pedidos.</p>";
     return;
   }
 
   list.innerHTML = orders.map((order) => `
     <div class="order-card">
-      <h3>Order ${order.id}</h3>
+      <h3>Pedido ${order.id}</h3>
       <p class="muted">${new Date(order.date).toLocaleDateString()}</p>
       <p>Total: ${formatPrice(order.total)}</p>
     </div>
@@ -557,14 +557,14 @@ function initAdmin() {
   const render = () => {
     const products = getProducts();
     list.innerHTML = `
-      <h3>Products</h3>
+      <h3>Productos</h3>
       <div class="admin-list">
         ${products.map((product) => `
           <div class="admin-item">
             <span>${product.name} - ${formatPrice(product.price)}</span>
             <div>
-              <button class="btn ghost" data-action="edit" data-id="${product.id}" type="button">Edit</button>
-              <button class="btn ghost" data-action="delete" data-id="${product.id}" type="button">Delete</button>
+              <button class="btn ghost" data-action="edit" data-id="${product.id}" type="button">Editar</button>
+              <button class="btn ghost" data-action="delete" data-id="${product.id}" type="button">Eliminar</button>
             </div>
           </div>
         `).join("")}
@@ -583,7 +583,7 @@ function initAdmin() {
           fields.category.value = product.category;
           fields.price.value = product.price;
           fields.image.value = product.image;
-          showToast("Producto cargado para edicion.", "info");
+          showToast("Producto cargado para edición.", "info");
           smoothScrollTo(form, { offset: 100 });
           return;
         }
@@ -613,7 +613,7 @@ function initAdmin() {
       category: fields.category.value,
       price: Number(fields.price.value),
       image: fields.image.value.trim(),
-      description: "Custom product"
+      description: "Producto personalizado"
     };
 
     await runButtonAction(submitButton, "Guardando...", async () => {
@@ -623,7 +623,7 @@ function initAdmin() {
         else addProduct(product);
       }, 420);
 
-      success.textContent = "Product saved.";
+      success.textContent = "Producto guardado.";
       form.reset();
       fields.id.value = "";
       Object.values(fields).forEach((field) => field?.classList.remove("input-valid", "input-invalid"));
@@ -667,7 +667,7 @@ function initContact() {
 
     await runButtonAction(submitButton, "Enviando...", async () => {
       await simulateAsync(() => true, 500);
-      success.textContent = "Thanks! We will reply soon.";
+      success.textContent = "¡Gracias! Te responderemos pronto.";
       form.reset();
       [name, email, message].forEach((input) => input.classList.remove("input-valid", "input-invalid"));
       showToast("Mensaje enviado. Te responderemos pronto.", "success");
@@ -690,7 +690,7 @@ function initHome() {
   newsletterForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (!validateField(emailInput, { required: true, isEmail: true })) {
-      showToast("Introduce un email valido para suscribirte.", "error");
+      showToast("Introduce un email válido para suscribirte.", "error");
       return;
     }
 
@@ -698,7 +698,7 @@ function initHome() {
       await simulateAsync(() => true, 350);
       newsletterForm.reset();
       emailInput.classList.remove("input-valid", "input-invalid");
-      showToast("Suscripcion completada.", "success");
+      showToast("Suscripción completada.", "success");
     });
   });
 }

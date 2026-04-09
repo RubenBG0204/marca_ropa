@@ -13,7 +13,7 @@ export function saveUsers(users) {
 export function registerUser({ name, email, password }) {
   const users = getUsers();
   if (users.find((u) => u.email === email)) {
-    return { success: false, message: "Email already registered." };
+    return { success: false, message: "El email ya está registrado." };
   }
   const user = { id: `u${Date.now()}`, name, email, password };
   users.push(user);
@@ -24,7 +24,7 @@ export function registerUser({ name, email, password }) {
 
 export function login(email, password) {
   const user = getUsers().find((u) => u.email === email && u.password === password);
-  if (!user) return { success: false, message: "Invalid credentials." };
+  if (!user) return { success: false, message: "Credenciales inválidas." };
   localStorage.setItem(CURRENT_KEY, JSON.stringify(user));
   return { success: true, user };
 }

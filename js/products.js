@@ -1,14 +1,14 @@
 ﻿// Product data and helpers
 const DEFAULT_PRODUCTS = [
-  { id: "p1", name: "Contour Seam Tee", price: 42, category: "tshirts", image: "img-2", description: "Breathable cotton with a tailored fit." },
-  { id: "p2", name: "Airline Tech Hoodie", price: 98, category: "hoodies", image: "img-1", description: "Soft fleece, structured hood." },
-  { id: "p3", name: "Studio Taper Pant", price: 76, category: "pants", image: "img-3", description: "Tapered leg, premium stretch." },
-  { id: "p4", name: "Aero Cap", price: 28, category: "accessories", image: "img-8", description: "Minimal embroidery, light fabric." },
-  { id: "p5", name: "Momentum Sneaker", price: 120, category: "shoes", image: "img-9", description: "Cushioned sole, urban ready." },
-  { id: "p6", name: "Soft Rib Tee", price: 35, category: "tshirts", image: "img-5", description: "Subtle rib texture, slim fit." },
-  { id: "p7", name: "Cloud Hoodie", price: 86, category: "hoodies", image: "img-6", description: "Relaxed fit, brushed inside." },
-  { id: "p8", name: "Flow Trousers", price: 72, category: "pants", image: "img-7", description: "Fluid drape with tailored finish." },
-  { id: "p9", name: "Signature Belt", price: 26, category: "accessories", image: "img-4", description: "Matte buckle, minimalist design." }
+  { id: "p1", name: "Camiseta Costura Contour", price: 42, category: "tshirts", image: "img-2", description: "Algodón transpirable con ajuste entallado." },
+  { id: "p2", name: "Sudadera Airline Tech", price: 98, category: "hoodies", image: "img-1", description: "Felpa suave con capucha estructurada." },
+  { id: "p3", name: "Pantalón Studio Taper", price: 76, category: "pants", image: "img-3", description: "Pierna entallada con elasticidad premium." },
+  { id: "p4", name: "Gorra Aero", price: 28, category: "accessories", image: "img-8", description: "Bordado minimalista, tejido ligero." },
+  { id: "p5", name: "Zapatilla Momentum", price: 120, category: "shoes", image: "img-9", description: "Suela amortiguada, lista para la ciudad." },
+  { id: "p6", name: "Camiseta Soft Rib", price: 35, category: "tshirts", image: "img-5", description: "Textura acanalada sutil, fit slim." },
+  { id: "p7", name: "Sudadera Cloud", price: 86, category: "hoodies", image: "img-6", description: "Ajuste relajado con interior perchado." },
+  { id: "p8", name: "Pantalón Flow", price: 72, category: "pants", image: "img-7", description: "Caída fluida con acabado sastre." },
+  { id: "p9", name: "Cinturón Signature", price: 26, category: "accessories", image: "img-4", description: "Hebilla mate, diseño minimalista." }
 ];
 
 const PRODUCT_KEY = "sigilious_products";
