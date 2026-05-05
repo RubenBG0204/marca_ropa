@@ -4,7 +4,11 @@ import {
   getProductById,
   addProduct,
   updateProduct,
-  deleteProduct
+  deleteProduct,
+  syncProductsFromSupabase,
+  addProductToSupabase,
+  updateProductInSupabase,
+  deleteProductFromSupabase
 } from "./products.js";
 import {
   addToCart,
@@ -12,10 +16,11 @@ import {
   updateQty,
   removeItem,
   clearCart,
-  cartCount
+  cartCount,
+  syncCartFromSupabase
 } from "./cart.js";
-import { registerUser, login, getCurrentUser, logout } from "./users.js";
-import { createOrder, getUserOrders } from "./orders.js";
+import { registerUser, login, getCurrentUser, logout, requestPasswordReset } from "./users.js";
+import { createOrder, getUserOrders, syncOrdersFromSupabase } from "./orders.js";
 import {
   showToast,
   setButtonLoading,
@@ -28,7 +33,6 @@ import { initMenu, initLoader, initScrollReveal, initPageTransitions, initTiltEf
 import { initRouter } from "./router.js";
 
 const page = document.body.dataset.page;
-const SIZE_OPTIONS = ["S", "M", "L", "XL"];
 
 initMenu();
 initLoader();
@@ -41,11 +45,17 @@ initRouter();
 initMobileNav();
 updateCartBadge();
 
+await syncProductsFromSupabase();
+await syncCartFromSupabase();
+await syncOrdersFromSupabase();
+updateCartBadge();
+
 if (page === "shop") initShop();
 if (page === "product") initProduct();
 if (page === "cart") initCart();
 if (page === "checkout") initCheckout();
 if (page === "login") initLogin();
+if (page === "forgot-password") initForgotPassword();
 if (page === "register") initRegister();
 if (page === "profile") initProfile();
 if (page === "orders") initOrders();
@@ -186,7 +196,7 @@ function initProduct() {
         <p class="price">${formatPrice(product.price)}</p>
         <p class="muted">${product.description}</p>
         <div class="size-selector" id="sizeSelector">
-          ${SIZE_OPTIONS.map((size) => `<button type="button" data-size="${size}">${size}</button>`).join("")}
+          ${product.sizes.map((size) => `<button type="button" data-size="${size}">${size}</button>`).join("")}
         </div>
         <small class="error" id="sizeError"></small>
         <div class="qty">
@@ -368,9 +378,9 @@ function initCheckout() {
     }
 
     await runButtonAction(submitButton, "Procesando...", async () => {
-      await simulateAsync(() => {
+      await simulateAsync(async () => {
         const user = getCurrentUser();
-        createOrder({
+        await createOrder({
           id: `o${Date.now()}`,
           userId: user ? user.id : "guest",
           name: name.value.trim(),
@@ -425,10 +435,48 @@ function initLogin() {
     await runButtonAction(submitButton, "Entrando...", async () => {
       const result = await simulateAsync(() => login(email.value.trim(), password.value), 420);
       if (result.success) {
+        await syncCartFromSupabase();
+        await syncOrdersFromSupabase();
+        updateCartBadge();
         success.textContent = "Inicio de sesión correcto.";
         showToast("Sesión iniciada correctamente.", "success");
       } else {
         success.textContent = "";
+        showToast(result.message, "error");
+      }
+    });
+  });
+}
+
+function initForgotPassword() {
+  const form = document.getElementById("forgotPasswordForm");
+  const success = document.getElementById("forgotPasswordSuccess");
+  if (!form || !success) return;
+
+  const email = document.getElementById("email");
+  const submitButton = form.querySelector('button[type="submit"]');
+  const rule = { input: email, config: { errorId: "emailError", required: true, isEmail: true } };
+
+  email?.addEventListener("blur", () => validateField(rule.input, rule.config));
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    success.textContent = "";
+
+    const isValid = validateField(rule.input, rule.config);
+    if (!isValid) {
+      showToast("Introduce un correo válido.", "error");
+      return;
+    }
+
+    await runButtonAction(submitButton, "Enviando...", async () => {
+      const result = await simulateAsync(() => requestPasswordReset(email.value.trim()), 420);
+      if (result.success) {
+        success.textContent = "Te hemos enviado un correo para recuperar la contraseña.";
+        showToast("Correo de recuperación enviado.", "success");
+        form.reset();
+        email.classList.remove("input-valid", "input-invalid");
+      } else {
         showToast(result.message, "error");
       }
     });
@@ -473,6 +521,9 @@ function initRegister() {
       }), 450);
 
       if (result.success) {
+        await syncCartFromSupabase();
+        await syncOrdersFromSupabase();
+        updateCartBadge();
         success.textContent = "Cuenta creada.";
         form.reset();
         [name, email, password].forEach((input) => input.classList.remove("input-valid", "input-invalid"));
@@ -501,8 +552,8 @@ function initProfile() {
     <button class="btn ghost" id="logoutBtn" type="button">Cerrar sesión</button>
   `;
 
-  document.getElementById("logoutBtn")?.addEventListener("click", () => {
-    logout();
+  document.getElementById("logoutBtn")?.addEventListener("click", async () => {
+    await logout();
     showToast("Sesión cerrada.", "info");
     window.setTimeout(() => window.location.reload(), 250);
   });
@@ -589,7 +640,14 @@ function initAdmin() {
         }
 
         await runButtonAction(button, "Eliminando...", async () => {
-          await simulateAsync(() => deleteProduct(id), 280);
+          await simulateAsync(async () => {
+            try {
+              await deleteProductFromSupabase(id);
+            } catch (error) {
+              console.warn(error);
+              deleteProduct(id);
+            }
+          }, 280);
           render();
           showToast("Producto eliminado.", "success");
         });
@@ -613,14 +671,21 @@ function initAdmin() {
       category: fields.category.value,
       price: Number(fields.price.value),
       image: fields.image.value.trim(),
-      description: "Producto personalizado"
+      description: "Producto personalizado",
+      sizes: ["S", "M", "L", "XL"]
     };
 
     await runButtonAction(submitButton, "Guardando...", async () => {
-      await simulateAsync(() => {
+      await simulateAsync(async () => {
         const exists = getProductById(product.id);
-        if (exists) updateProduct(product);
-        else addProduct(product);
+        try {
+          if (exists) await updateProductInSupabase(product);
+          else await addProductToSupabase(product);
+        } catch (error) {
+          console.warn(error);
+          if (exists) updateProduct(product);
+          else addProduct(product);
+        }
       }, 420);
 
       success.textContent = "Producto guardado.";
